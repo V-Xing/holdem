@@ -30,6 +30,7 @@ from treys import Card, Deck, Evaluator
 
 from .player import Player
 from .utils import hand_to_str, format_action, action_table, community_table, player_table
+from .equity_evaluation import Equity
 
 class Street(IntEnum):
     NOT_STARTED = 0
@@ -44,7 +45,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                       [150,300], [200,400], [300,600], [400,800], [500,10000],
                       [600,1200], [800,1600], [1000,2000]]
 
-  def __init__(self, n_seats, max_limit=100000, debug=False):
+  def __init__(self, n_seats, max_limit=100000, all_in_equity_reward=False, equity_steps=100, debug=False):
     n_suits = 4                     # s,h,d,c
     n_ranks = 13                    # 2,3,4,5,6,7,8,9,T,J,Q,K,A
     n_pocket_cards = 2
@@ -58,7 +59,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     self._evaluator = Evaluator()
 
     self.community = []
-    self._round = Street.NOT_STARTED
+    self._street = Street.NOT_STARTED
     self._button = 0
 
     self._side_pots = [0] * n_seats
@@ -76,6 +77,9 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     self._debug = debug
     self._last_player = None
     self._last_actions = None
+
+    self.equity_reward = all_in_equity_reward
+    self.equity = Equity(n_evaluations=equity_steps)
 
     self.observation_space = spaces.Tuple([
       spaces.Tuple([                # players
@@ -155,14 +159,13 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     [self._smallblind, self._bigblind] = TexasHoldemEnv.BLIND_INCREMENTS[0]
     if len(self._player_dict) >= 2:
       players = [p for p in self._seats if p.playing_hand]
-      self._new_round()
+      self._new_street()
       self._current_player = self._first_to_act(players)
       self._post_smallblind(self._current_player)
       self._current_player = self._next(players, self._current_player)
       self._post_bigblind(self._current_player)
       self._current_player = self._next(players, self._current_player)
       self._tocall = self._bigblind
-      self._deal_next_round()
       self._folded_players = []
     return self._get_current_reset_returns()
 
@@ -181,7 +184,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     if self._current_player is None:
       raise error.Error('Round cannot be played without 2 or more players.')
 
-    if self._round == Street.SHOWDOWN:
+    if self._street == Street.SHOWDOWN:
       raise error.Error('Rounds already finished, needs to be reset.')
 
     players = [p for p in self._seats if p.playing_hand]
@@ -195,8 +198,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       if self._current_player.isallin:
         self._current_player = self._next(players, self._current_player)
         return self._get_current_step_returns(False)
-      move = self._current_player.validate_action(
-              self._output_state(self._current_player), actions[self._current_player.player_id])
+      move = self._current_player.validate_action(self._output_state(self._current_player), actions[self._current_player.player_id])
       if self._debug:
         print('Player', self._current_player.player_id, move)
       self._player_action(self._current_player, move[1])
@@ -211,16 +213,23 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         players.remove(prev_player)
         self._folded_players.append(prev_player)
 
+    everyone_all_in = len(players) > 1 and all([player.isallin for player in players])
+
+    if everyone_all_in and self.equity_reward:
+      self._street = Street.SHOWDOWN
+
     if all([player.playedthisround for player in players]):
-      self._resolve(players)
+      self._resolve_street(players)
+
+    if everyone_all_in and not self.equity_reward:
+      while self._street < Street.SHOWDOWN:
+          self._deal_next_street()
 
     terminal = False
-    if all([player.isallin for player in players]):
-      while self._round < Street.SHOWDOWN:
-        self._deal_next_round()
-    if self._round == Street.SHOWDOWN or len(players) == 1:
+    if self._street == Street.SHOWDOWN or len(players) == 1:
       terminal = True
-      self._resolve_round(players)
+      self._resolve_hand(players)
+
     return self._get_current_step_returns(terminal)
 
   def render(self, mode='human', close=False):
@@ -265,24 +274,22 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         return (sb_idx, idx)
       idx = (idx + 1) % len(self._seats)
 
-  def _resolve(self, players):
+  def _resolve_street(self, players):
     self._current_player = self._first_to_act(players)
     self._resolve_sidepots(players + self._folded_players)
-    self._new_round()
-    self._deal_next_round()
-    if self._debug:
-      print('totalpot', self._totalpot)
+    if self._street < Street.SHOWDOWN:
+      self._new_street()
 
-  def _deal_next_round(self):
-    if self._round == Street.NOT_STARTED:
+  def _deal_next_street(self):
+    if self._street == Street.NOT_STARTED:
       self._deal()
-    elif self._round == Street.PREFLOP:
+    elif self._street == Street.PREFLOP:
       self._flop()
-    elif self._round == Street.FLOP:
+    elif self._street == Street.FLOP:
       self._turn()
-    elif self._round == Street.TURN:
+    elif self._street == Street.TURN:
       self._river()
-    self._round += 1
+    self._street += 1
 
   def _increment_blinds(self):
     self._blind_index = min(self._blind_index + 1, len(TexasHoldemEnv.BLIND_INCREMENTS) - 1)
@@ -315,7 +322,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     self._lastraise = max(self._lastraise, relative_bet  - self._lastraise)
 
   def _first_to_act(self, players):
-    if self._round == Street.NOT_STARTED and len(players) == 2:
+    if self._street == Street.NOT_STARTED and len(players) == 2:
       return self._next(sorted(
           players + [self._seats[self._button]], key=lambda x:x.get_seat()),
           self._seats[self._button])
@@ -371,46 +378,68 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     if self._debug:
       print('sidepots: ', self._side_pots)
 
-  def _new_round(self):
+  def _new_street(self):
     for player in self._player_dict.values():
       player.currentbet = 0
       player.playedthisround = False
     self._tocall = 0
     self._lastraise = 0
+    self._deal_next_street()
+    if self._debug:
+      print('totalpot', self._totalpot)
 
-  def _resolve_round(self, players):
+  def _resolve_hand(self, players):
     if len(players) == 1:
       players[0].refund(sum(self._side_pots))
       self._totalpot = 0
     else:
-      # compute hand ranks
-      for player in players:
-        player.handrank = self._evaluator.evaluate(player.hand, self.community)
-
       # trim side_pots to only include the non-empty side pots
       temp_pots = [pot for pot in self._side_pots if pot > 0]
+      
+      if self.equity_reward:
+        for pot_idx,_ in enumerate(temp_pots):
+          # find players involved in given side_pot, compute the equities and pot split
+          pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
+          equities = self.equity.get_equities([p.hand for p in pot_contributors], self.community, self._deck.cards)
+          amount_distributed = 0
+          for p_idx, player in enumerate(pot_contributors):
+            split_amount = int(self._side_pots[pot_idx] * equities[p_idx])
+            if self._debug:
+              print('Player', player.player_id, 'wins side pot (', split_amount, ')')
+            player.refund(split_amount)
+            amount_distributed += split_amount
+          self._side_pots[pot_idx] -= amount_distributed
 
-      # compute who wins each side pot and pay winners
-      for pot_idx,_ in enumerate(temp_pots):
-        # find players involved in given side_pot, compute the winner(s)
-        pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
-        winning_rank = min([p.handrank for p in pot_contributors])
-        winning_players = [p for p in pot_contributors if p.handrank == winning_rank]
+          # any remaining chips after splitting go to the winner in the earliest position
+          if self._side_pots[pot_idx]:
+            earliest = self._first_to_act([player for player in pot_contributors])
+            earliest.refund(self._side_pots[pot_idx])
+      else:
+        # compute hand ranks
+        for player in players:
+          player.handrank = self._evaluator.evaluate(player.hand, self.community)
 
-        for player in winning_players:
-          split_amount = int(self._side_pots[pot_idx]/len(winning_players))
-          if self._debug:
-            print('Player', player.player_id, 'wins side pot (', int(self._side_pots[pot_idx]/len(winning_players)), ')')
-          player.refund(split_amount)
-          self._side_pots[pot_idx] -= split_amount
+        # compute who wins each side pot and pay winners
+        for pot_idx,_ in enumerate(temp_pots):
+          # find players involved in given side_pot, compute the winner(s)
+          pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
+          winning_rank = min([p.handrank for p in pot_contributors])
+          winning_players = [p for p in pot_contributors if p.handrank == winning_rank]
 
-        # any remaining chips after splitting go to the winner in the earliest position
-        if self._side_pots[pot_idx]:
-          earliest = self._first_to_act([player for player in winning_players])
-          earliest.refund(self._side_pots[pot_idx])
+          for player in winning_players:
+            split_amount = int(self._side_pots[pot_idx]/len(winning_players))
+            if self._debug:
+              print('Player', player.player_id, 'wins side pot (', int(self._side_pots[pot_idx]/len(winning_players)), ')')
+            player.refund(split_amount)
+            self._side_pots[pot_idx] -= split_amount
+
+          # any remaining chips after splitting go to the winner in the earliest position
+          if self._side_pots[pot_idx]:
+            earliest = self._first_to_act([player for player in winning_players])
+            earliest.refund(self._side_pots[pot_idx])
 
   def _reset_game(self):
-    self._round = Street.NOT_STARTED
+    self._street = Street.NOT_STARTED
     playing = 0
     for player in self._seats:
       if not player.emptyplayer and not player.sitting_out:
