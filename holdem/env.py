@@ -59,6 +59,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     self._evaluator = Evaluator()
 
     self.community = []
+    self._dead_cards = []
     self._street = Street.NOT_STARTED
     self._button = 0
 
@@ -209,6 +210,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       prev_player = self._current_player
       self._current_player = self._next(players, self._current_player)
       if move[0] == 'fold':
+        self._dead_cards += prev_player.hand
         prev_player.playing_hand = False
         players.remove(prev_player)
         self._folded_players.append(prev_player)
@@ -400,7 +402,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         for pot_idx,_ in enumerate(temp_pots):
           # find players involved in given side_pot, compute the equities and pot split
           pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
-          equities = self.equity.get_equities([p.hand for p in pot_contributors], self.community, self._deck.cards)
+          equities = self.equity.get_equities([p.hand for p in pot_contributors], self.community, self._deck.cards, self._dead_cards)
           amount_distributed = 0
           for p_idx, player in enumerate(pot_contributors):
             split_amount = int(self._side_pots[pot_idx] * equities[p_idx])
@@ -446,6 +448,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         player.reset_hand()
         playing += 1
     self.community = []
+    self._dead_cards = []
     self._current_sidepot = 0
     self._totalpot = 0
     self._side_pots = [0] * len(self._seats)

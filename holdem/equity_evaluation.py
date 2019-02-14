@@ -52,18 +52,17 @@ use_c_backend = True
 
 try:
     pcalc = ctypes.CDLL(pbots_calc)
+    # Set the argtype and return types from the library.
+    pcalc.calc.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.POINTER(_Results)]
+    pcalc.calc.restype = ctypes.c_int
+    pcalc.alloc_results.argtypes = []
+    pcalc.alloc_results.restype = ctypes.POINTER(_Results)
+    pcalc.free_results.argtypes = [ctypes.POINTER(_Results)]
+    pcalc.free_results.restype = None
 except OSError:
     print("ERROR: Could not locate %s. Please ensure your enviroment library load path is set properly." % pbots_calc)
     print('Using slow Python hand equity evaluation as a fallback')
     use_c_backend = False
-
-# Set the argtype and return types from the library.
-pcalc.calc.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.POINTER(_Results)]
-pcalc.calc.restype = ctypes.c_int
-pcalc.alloc_results.argtypes = []
-pcalc.alloc_results.restype = ctypes.POINTER(_Results)
-pcalc.free_results.argtypes = [ctypes.POINTER(_Results)]
-pcalc.free_results.restype = None
 
 class Results:
     def __init__(self, res):
@@ -93,13 +92,12 @@ class Equity():
     def __init__(self, n_evaluations=500):
         self.evaluator = Evaluator()
         self.n_evaluations = n_evaluations
-        self._deck_instead_of_dead = use_c_backend
 
-    def get_equities(self, hands, community, dead, deck):
-        if self._deck_instead_of_dead:
-            return self._get_equities_python(hands, community, deck)
-        else:
+    def get_equities(self, hands, community, deck, dead):
+        if use_c_backend:
             return self._get_equities_c(hands, community, dead)
+        else:
+            return self._get_equities_python(hands, community, deck)
 
     def _get_equities_c(self, hands, community, dead):
         for i in range(len(hands)):
@@ -109,9 +107,7 @@ class Equity():
         hands = bytes(':'.join(hands), encoding='utf-8')
         community = bytes(''.join(community), encoding='utf-8')
         dead = bytes(''.join(dead), encoding='utf-8')
-        print(hands, community, dead)
         results = calc(hands, b'', b'', self.n_evaluations)
-        print(results)
         return results.ev
 
     def _get_equities_python(self, hands, community, deck):
