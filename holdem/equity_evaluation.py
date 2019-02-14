@@ -21,18 +21,102 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+
 import numpy as np
+from multiprocessing.pool import ThreadPool
+from multiprocessing import cpu_count
+from threading import Thread
 
 from treys import Card, Deck, Evaluator
 
-class Equity():
-    def __init__(self, n_evaluations=100):
-        self.n_evaluations = n_evaluations
-        self.evaluator = Evaluator()
+import os
+import ctypes
+import ctypes.util
+import sys
 
-    def get_equities(self, hands, community, deck):
+if sys.platform.startswith('win'):
+    pbots_calc = "pbots_calc"
+elif sys.platform.startswith('darwin'):
+    pbots_calc = "libpbots_calc.dylib"
+else:
+    pbots_calc = "libpbots_calc.so"
+
+class _Results(ctypes.Structure):
+    _fields_ = [("ev", ctypes.POINTER(ctypes.c_double)),
+                ("hands", ctypes.POINTER(ctypes.c_char_p)),
+                ("iters", ctypes.c_int),
+                ("size", ctypes.c_int),
+                ("MC", ctypes.c_int)]
+
+use_c_backend = True
+
+try:
+    pcalc = ctypes.CDLL(pbots_calc)
+except OSError:
+    print("ERROR: Could not locate %s. Please ensure your enviroment library load path is set properly." % pbots_calc)
+    print('Using slow Python hand equity evaluation as a fallback')
+    use_c_backend = False
+
+# Set the argtype and return types from the library.
+pcalc.calc.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.POINTER(_Results)]
+pcalc.calc.restype = ctypes.c_int
+pcalc.alloc_results.argtypes = []
+pcalc.alloc_results.restype = ctypes.POINTER(_Results)
+pcalc.free_results.argtypes = [ctypes.POINTER(_Results)]
+pcalc.free_results.restype = None
+
+class Results:
+    def __init__(self, res):
+        self.size = res.size
+        self.MC_used = res.MC
+        self.iters = res.iters
+        self.ev = []
+        self.hands = []
+        for i in range(self.size):
+            self.ev.append(res.ev[i])
+            self.hands.append(res.hands[i])
+    def __str__(self):
+        return str(zip(self.hands, self.ev))
+
+def calc(hands, board, dead, iters):
+    res = pcalc.alloc_results()
+    err = pcalc.calc(hands, board, dead, iters, res)
+    if err > 0:
+        results = Results(res[0])
+    else:
+        print("error: could not parse input or something...")
+        results = None
+    pcalc.free_results(res)
+    return results
+
+class Equity():
+    def __init__(self, n_evaluations=500):
+        self.evaluator = Evaluator()
+        self.n_evaluations = n_evaluations
+        self._deck_instead_of_dead = use_c_backend
+
+    def get_equities(self, hands, community, dead, deck):
+        if self._deck_instead_of_dead:
+            return self._get_equities_python(hands, community, deck)
+        else:
+            return self._get_equities_c(hands, community, dead)
+
+    def _get_equities_c(self, hands, community, dead):
+        for i in range(len(hands)):
+            hands[i] = ''.join([Card.int_to_str(hands[i][0]), Card.int_to_str(hands[i][1])])
+        community = [Card.int_to_str(h) for h in community]
+        dead = [Card.int_to_str(h) for h in dead]
+        hands = bytes(':'.join(hands), encoding='utf-8')
+        community = bytes(''.join(community), encoding='utf-8')
+        dead = bytes(''.join(dead), encoding='utf-8')
+        print(hands, community, dead)
+        results = calc(hands, b'', b'', self.n_evaluations)
+        print(results)
+        return results.ev
+
+    def _get_equities_python(self, hands, community, deck):
         victories = np.zeros(len(hands))
-        for i in range(self.n_evaluations):
+        for _ in range(self.n_evaluations):
             cur_community = community.copy()
             cur_deck = deck.copy()
             added_cards = np.random.choice(cur_deck, size=(5 - len(cur_community)), replace=False).tolist()
@@ -46,11 +130,22 @@ class Equity():
 
 if __name__ == '__main__':
     deck = Deck()
-    equity = Equity()
+    equity = Equity(1000)
     card1, card2, card3, card4 = deck.draw(4)
+    dead = [card1, card2, card3, card4]
     cards = [[card1, card2], [card3, card4]]
     board = []
-    equities = equity.get_equities(cards, board, deck.cards)
-    Card.print_pretty_card
+
+    import time
+
+    start = time.time()
+    equities = equity._get_equities_python(cards, board, deck.cards)
     print(Card.print_pretty_card(card1), Card.print_pretty_card(card2), 'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
     print(equities)
+    print('Python takes %ss' % (time.time() - start,))
+
+    start = time.time()
+    equities = equity._get_equities_c(cards, board, dead)
+    print(Card.print_pretty_card(card1), Card.print_pretty_card(card2), 'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
+    print(equities)
+    print('C takes %ss' % (time.time() - start,))
