@@ -43,15 +43,12 @@ class community_table(IntEnum):
   TO_ACT_POS = 7
 
 class player_table(IntEnum):
-  SEAT_EMPTY = 0
-  SEAT_ID = 1
-  STACK = 2
-  IS_IN_POT = 3
-  HAND_RANK = 4
-  HAS_ACTED = 5
-  IS_BETTING = 6
-  IS_ALL_IN = 7
-  LAST_SIDEPOT = 8
+  CURRENT_BET = 0
+  STACK = 1
+  IS_IN_POT = 2
+  HAS_ACTED = 3
+  IS_ALL_IN = 4
+  LAST_SIDEPOT = 5
 
 def format_action(player, action):
   color = False

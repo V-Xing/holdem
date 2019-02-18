@@ -50,7 +50,6 @@ class Player(object):
 
     # flags for table management
     self.emptyplayer = emptyplayer
-    self.betting = False
     self.isallin = False
     self.playing_hand = False
     self.playedthisround = False

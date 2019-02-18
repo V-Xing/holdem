@@ -482,15 +482,14 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
   def _get_current_state(self):
     player_states = []
-    for player in self._seats:
+    n_players = len(self._seats)
+    for i in range(self._current_player.player_id, self._current_player.player_id + n_players):
+      player = self._seats[i % n_players]
       player_features = [
-        int(player.emptyplayer),
-        int(player.get_seat()),
+        int(player.currentbet),
         int(player.stack),
         int(player.playing_hand),
-        int(player.handrank),
         int(player.playedthisround),
-        int(player.betting),
         int(player.isallin),
         int(player.lastsidepot),
       ]
