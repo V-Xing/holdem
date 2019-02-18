@@ -250,6 +250,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     print('-' + hand_to_str(community_cards))
     print('players:')
     for idx, hand in enumerate(player_hands):
+      idx = (idx + self._current_player.player_id) % len(self._seats) 
       position_string = self._get_blind_str(blinds_idxs, idx)
       print('{} {}{}stack: {}'.format(idx, position_string, hand_to_str(hand), self._seats[idx].stack))
 
@@ -398,7 +399,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       # trim side_pots to only include the non-empty side pots
       temp_pots = [pot for pot in self._side_pots if pot > 0]
       
-      if self.equity_reward:
+      if self.equity_reward and len(self.community) < 5:
         for pot_idx,_ in enumerate(temp_pots):
           # find players involved in given side_pot, compute the equities and pot split
           pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
