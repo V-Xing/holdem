@@ -286,7 +286,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
   def _resolve_street(self, players):
     self._current_player = self._first_to_act(players)
     self._resolve_sidepots(players + self._folded_players)
-    if self._street < Street.SHOWDOWN:# and len(players) > 1:
+    if self._street < Street.SHOWDOWN:
       self._reset_street_state()
       self._deal_next_street()
 
@@ -395,7 +395,6 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         player.playedthisround = False
     self._tocall = 0
     self._lastraise = 0
-    #self._deal_next_street()
     if self._debug:
       print('totalpot', self._totalpot)
 
@@ -405,7 +404,6 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       if self._debug:
         print('Refunding, sum(sidepots) %s, totalpot %s' % (str(sum(self._side_pots)), str(self._totalpot)))
       players[0].refund(self._totalpot)
-      #self._totalpot = 0
     else:
       # trim side_pots to only include the non-empty side pots
       temp_pots = [pot for pot in self._side_pots if pot > 0]
