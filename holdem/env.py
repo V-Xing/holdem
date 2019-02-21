@@ -477,7 +477,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       'bigblind': self._bigblind,
       'player_id': current_player.player_id,
       'lastraise': self._lastraise,
-      'minraise': max(self._bigblind, self._lastraise + self._tocall),
+      'minraise': min(max(self._bigblind, self._lastraise + self._tocall), current_player.stack),
     }
 
   def _pad(self, l, n, v):
@@ -505,7 +505,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       int(self._bigblind),
       int(self._totalpot),
       int(self._lastraise),
-      int(max(self._bigblind, self._lastraise + self._tocall)),
+      int(min(max(self._bigblind, self._lastraise + self._tocall), self._current_player.stack)),
       int(self._tocall - self._current_player.currentbet),
       int(self._current_player.player_id),
     ], self._pad(self.community, 5, -1))

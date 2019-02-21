@@ -280,6 +280,107 @@ def test_bet_sizes_3_player():
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous SB is now BTN
     assert community_infos[community_table.TO_ACT_POS] == 1 # BTN acts first 3-way
 
+def test_min_max_bet():
+    # 2 Players
+    env = _create_env(2)
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN minraises
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 2])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 2
+    assert community_infos[community_table.POT] == env._bigblind * 3
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # BB minraises
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 3])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 2
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 3
+    assert community_infos[community_table.POT] == env._bigblind * 5
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN raises from 3 to 10 bb
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 10])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 3
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 10
+    assert community_infos[community_table.POT] == env._bigblind * 13
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # BB raises from 10 to 50
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 50])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 10
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 60
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN raises from 50 to 90 bb
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 90])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 90
+    assert community_infos[community_table.POT] == env._bigblind * 140
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # BB shoves 100 bb
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 100])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 90
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 100
+    assert community_infos[community_table.POT] == env._bigblind * 190
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [-(90 * env._bigblind - env._smallblind) / env._bigblind, 91]
+    assert d == True
+    assert i['money_won'] == -90 * env._bigblind
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 190
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # Reset environment to play next hand
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
+    assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
+
 # Private methods
 
 def _unpack_state(state):
