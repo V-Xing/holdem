@@ -132,7 +132,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     _, seed = seeding.np_random(seed)
     return [seed]
 
-  def add_player(self, seat_id, stack=2000):
+  def add_player(self, seat_id, stack=2500):
     """Add a player to the environment seat with the given stack (chipcount)"""
     player_id = seat_id
     if player_id not in self._player_dict:
