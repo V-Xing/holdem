@@ -195,36 +195,38 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     if len(players) <= 1:
       raise error.Error('Round cannot be played with one or less players.')
 
+    if not any([p.isallin == False for p in players]):
+      raise error.Error('Eveyone all in, round should be finished')
+
     if self._current_player.isallin:
-      raise Exception('This should never happen, position to act should pass players that can\'t take any actions')
+      raise error.Error('This should never happen, position to act should pass players that can\'t take any actions')
 
     self._last_player = self._current_player
     self._last_actions = actions
 
-    if any([p.isallin == False for p in players]):
-      
-      move = self._current_player.validate_action(self._output_state(self._current_player), actions[self._current_player.player_id])
-      if self._debug:
-        print('Player', self._current_player.player_id, move)
-      self._player_action(self._current_player, move[1])
-      if move[0] == 'raise':
-        for p in players:
-          if p != self._current_player:
-            p.playedthisround = False
-      prev_player = self._current_player
-      self._current_player = self._next(players, self._current_player)
-      if move[0] == 'fold':
-        self._dead_cards += prev_player.hand
-        prev_player.playing_hand = False
-        players.remove(prev_player)
-        self._folded_players.append(prev_player)
+    move = self._current_player.validate_action(self._output_state(self._current_player), actions[self._current_player.player_id])
+    if self._debug:
+      print('Player', self._current_player.player_id, move)
+    self._player_action(self._current_player, move[1])
+    if move[0] == 'raise':
+      for p in players:
+        if p != self._current_player and not p.isallin:
+          p.playedthisround = False
+    prev_player = self._current_player
+    self._current_player = self._next(players, self._current_player)
+    if move[0] == 'fold':
+      self._dead_cards += prev_player.hand
+      prev_player.playing_hand = False
+      players.remove(prev_player)
+      self._folded_players.append(prev_player)
 
     everyone_all_in = len(players) > 1 and all([player.isallin for player in players])
+    everyone_played_this_round = all([player.playedthisround for player in players])
 
     if everyone_all_in and self.equity_reward:
       self._street = Street.SHOWDOWN
 
-    if all([player.playedthisround for player in players]):
+    if everyone_played_this_round:
       self._resolve_street(players)
 
     if everyone_all_in and not self.equity_reward:
@@ -284,7 +286,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
   def _resolve_street(self, players):
     self._current_player = self._first_to_act(players)
     self._resolve_sidepots(players + self._folded_players)
-    if self._street < Street.SHOWDOWN:
+    if self._street < Street.SHOWDOWN:# and len(players) > 1:
       self._reset_street_state()
       self._deal_next_street()
 
@@ -339,6 +341,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       return self._next(players, self._seats[self._button])
 
   def _next(self, players, current_player):
+    players = [player for player in players if not player.isallin or player is current_player]
     idx = players.index(current_player)
     return players[(idx+1) % len(players)]
 
@@ -381,13 +384,15 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     if smallest_players_allin:
       self._current_sidepot += 1
       self._resolve_sidepots(players)
+    assert sum(self._side_pots) == self._totalpot
     if self._debug:
       print('sidepots: ', self._side_pots)
 
   def _reset_street_state(self):
     for player in self._player_dict.values():
       player.currentbet = 0
-      player.playedthisround = False
+      if not player.isallin:
+        player.playedthisround = False
     self._tocall = 0
     self._lastraise = 0
     #self._deal_next_street()
@@ -409,14 +414,18 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         for pot_idx,_ in enumerate(temp_pots):
           # find players involved in given side_pot, compute the equities and pot split
           pot_contributors = [p for p in players if p.lastsidepot >= pot_idx]
-          equities = self.equity.get_equities([p.hand for p in pot_contributors], self.community, self._deck.cards, self._dead_cards)
-          amount_distributed = 0
-          for p_idx, player in enumerate(pot_contributors):
-            split_amount = int(self._side_pots[pot_idx] * equities[p_idx])
-            if self._debug:
-              print('Player', player.player_id, 'wins side pot (', split_amount, ')')
-            player.refund(split_amount)
-            amount_distributed += split_amount
+          if len(pot_contributors) > 1:
+            equities = self.equity.get_equities([p.hand for p in pot_contributors], self.community, self._deck.cards, self._dead_cards)
+            amount_distributed = 0
+            for p_idx, player in enumerate(pot_contributors):
+              split_amount = int(round(self._side_pots[pot_idx] * equities[p_idx]))
+              if self._debug:
+                print('Player', player.player_id, 'wins side pot (', split_amount, ')')
+              player.refund(split_amount)
+              amount_distributed += split_amount
+          else:
+            amount_distributed = int(self._side_pots[pot_idx])
+            pot_contributors[0].refund(amount_distributed)
           self._side_pots[pot_idx] -= amount_distributed
 
           # any remaining chips after splitting go to the winner in the earliest position

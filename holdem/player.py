@@ -35,12 +35,13 @@ class Player(object):
   RAISE = 2
   FOLD = 3
 
-  def __init__(self, player_id, stack=2000, emptyplayer=False):
+  def __init__(self, player_id, stack=2500, emptyplayer=False):
     self.player_id = player_id
 
     self.hand = []
-    self.stack = stack
-    self.hand_starting_stack = self.stack
+    self.starting_stack = stack
+    #self.stack = stack
+    #self.hand_starting_stack = self.stack
     self.currentbet = 0
     self.lastsidepot = 0
     self._seat = -1
@@ -90,8 +91,11 @@ class Player(object):
   def player_state(self):
     return (self.get_seat(), self.stack, self.playing_hand, self.betting, self.player_id)
 
-  def reset_stack(self, amount=2500):
-    self.stack = amount
+  def reset_stack(self, amount=None):
+    if amount is None:
+      self.stack = self.starting_stack
+    else:
+      self.stack = amount
 
   def update_localstate(self, table_state):
     self.stack = table_state.get('stack')
@@ -130,7 +134,7 @@ class Player(object):
           raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CALL:
-        move_tuple = ('call', tocall)
+        move_tuple = ('call', min(tocall, stack_for_street))
       elif action_idx == Player.FOLD:
         move_tuple = ('fold', self.currentbet)
     return move_tuple

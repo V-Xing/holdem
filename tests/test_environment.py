@@ -371,7 +371,6 @@ def test_min_max_bet():
     assert player_infos[1][player_table.CURRENT_BET] == 0
     assert community_infos[community_table.POT] == env._bigblind * 190
     assert community_infos[community_table.BUTTON_POS] == 0
-    assert community_infos[community_table.TO_ACT_POS] == 1
 
     # Reset environment to play next hand
     player_infos, _, community_infos, _ = _reset_env(env)
@@ -406,8 +405,9 @@ def test_preflop_allin_call():
     s, r, d, i = _step(env, [action_table.CALL, 0])
     player_infos, _, community_infos, _ = _unpack_state(s)
     assert d == True
+    assert player_infos[0][player_table.STACK] + player_infos[1][player_table.STACK] == env._bigblind * 200
     assert round(sum(r), 2) == (env._bigblind + env._smallblind) / env._bigblind
-    assert abs(i['money_won']) == 100 * env._bigblind
+    assert abs(i['money_won']) == 100 * env._bigblind or abs(i['money_won']) == 50 * env._bigblind # in case of split-pot
     assert player_infos[0][player_table.CURRENT_BET] == 0
     assert player_infos[1][player_table.CURRENT_BET] == 0
     assert community_infos[community_table.POT] == env._bigblind * 200
@@ -420,6 +420,141 @@ def test_preflop_allin_call():
     assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
     assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
     assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+
+def test_custom_stacks():
+    env = TexasHoldemEnv(4)
+    env.add_player(0, stack=env._bigblind * 500)
+    env.add_player(1, stack=env._bigblind * 40)
+    env.add_player(2, stack=env._bigblind * 100)
+    env.add_player(3, stack=env._bigblind * 10)
+    player_infos, _, _, _ = _reset_env(env)
+    assert player_infos[1][player_table.STACK] == env._bigblind * 500 # BTN
+    assert player_infos[2][player_table.STACK] == env._bigblind * 40 - env._smallblind
+    assert player_infos[3][player_table.STACK] == env._bigblind * 99
+    assert player_infos[0][player_table.STACK] == env._bigblind * 10
+
+def test_turn_passes_fold_and_all_in():
+    # 4 Players
+    env = TexasHoldemEnv(4, all_in_equity_reward=True)
+    env.add_player(0, stack=env._bigblind * 100)
+    env.add_player(1, stack=env._bigblind * 100)
+    env.add_player(2, stack=env._bigblind * 40)
+    env.add_player(3, stack=env._bigblind * 100)
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.STACK] == env._bigblind * 100
+    assert player_infos[1][player_table.STACK] == env._bigblind * 100
+    assert player_infos[2][player_table.STACK] == env._bigblind * 100 - env._smallblind
+    assert player_infos[3][player_table.STACK] == env._bigblind * 39
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[3][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.TO_ACT_POS] == 3
+
+    # CO bets 50 bb (leaves 50 bb behind), BTN to act
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 50])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[3][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 51 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN flats (leaves 50 bb behind), SB to act
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[3][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 101 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB folds, BB to act
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+    assert player_infos[3][player_table.IS_IN_POT] == 0 # SB folded
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[3][player_table.CURRENT_BET] == env._smallblind
+    assert community_infos[community_table.POT] == env._bigblind * 101 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+
+    # BB calls 40 bb and is all in in sidepot, CO to act first on flop (others all in or folded)
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert sum(env._side_pots) == community_infos[community_table.POT]
+    assert community_infos[community_table.TO_ACT_POS] == 3
+    assert player_infos[2][player_table.IS_IN_POT] == 0 # SB folded
+    assert player_infos[3][player_table.IS_IN_POT] == 1 # BB allin
+    assert player_infos[3][player_table.HAS_ACTED] == 1 # BB allin - should have acted automatically
+    assert player_infos[0][player_table.STACK] == env._bigblind * 50 # CO
+    assert player_infos[1][player_table.STACK] == env._bigblind * 50
+    assert player_infos[2][player_table.STACK] == env._bigblind * 100 - env._smallblind
+    assert player_infos[3][player_table.STACK] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert player_infos[3][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 140 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+
+    # CO shoves 50 bb, BTN to act
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 50])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert sum(env._side_pots) == community_infos[community_table.POT] - env._bigblind * 50 # Should it be this way?
+    assert r == [0, 0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert player_infos[3][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 190 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert community_infos[community_table.TO_ACT_POS] == 0 # BTN to act
+    assert community_infos[community_table.POT] == env._bigblind * 190 + env._smallblind
+    assert sum(env._side_pots) == 0
+    assert player_infos[0][player_table.STACK] == env._bigblind * 50
+    assert player_infos[1][player_table.STACK] == env._bigblind * 100 - env._smallblind
+    assert player_infos[2][player_table.STACK] + player_infos[3][player_table.STACK] == env._bigblind * 190 + env._smallblind
+    assert sum([player[player_table.STACK] for player in player_infos]) == env._bigblind * 340
+    assert r[0] == -50
+    assert r[1] == 0
+    assert round(r[2] + r[3]) == 51
+    assert round(sum(r), 2) == (env._bigblind + env._smallblind) / env._bigblind
+    assert d == True
+    assert i['money_won'] == -50 * env._bigblind
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert player_infos[3][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.BUTTON_POS] == 0
+
+### test calling with less than 1bb left
 
 # Private methods
 
