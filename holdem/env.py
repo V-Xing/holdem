@@ -241,6 +241,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     return self._get_current_step_returns(terminal)
 
   def render(self, mode='human', close=False):
+    print('<=============== Next Move ===============>')
     print('total pot: {}'.format(self._totalpot))
     if self._last_actions is not None:
       pid = self._last_player.player_id
@@ -248,7 +249,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       print(format_action(self._last_player, self._last_actions[pid]))
 
     (player_states, community_states) = self._get_current_state()
-    (_, player_hands) = zip(*player_states)
+    (player_infos, player_hands) = zip(*player_states)
     (community_infos, community_cards) = community_states
     blinds_idxs = self._get_blind_indexes(community_infos)
 
@@ -256,9 +257,10 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     print('-' + hand_to_str(community_cards))
     print('players:')
     for idx, hand in enumerate(player_hands):
-      idx = (idx + self._current_player.player_id) % len(self._seats) 
-      position_string = self._get_blind_str(blinds_idxs, idx)
-      print('{} {}{}stack: {}'.format(idx, position_string, hand_to_str(hand), self._seats[idx].stack))
+      idx_relative = (idx + self._current_player.player_id) % len(self._seats)
+      position_string = self._get_blind_str(blinds_idxs, idx_relative)
+      folded = "F" if not player_infos[idx][player_table.IS_IN_POT] else " "
+      print('{} {} {}{}stack: {}'.format(idx_relative, position_string, folded, hand_to_str(hand), self._seats[idx_relative].stack))
 
   def _get_blind_str(self, blinds_idxs, idx):
     if idx == blinds_idxs[0]:
