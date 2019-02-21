@@ -79,6 +79,9 @@ The observation returned is a `tuple` of the following by index:
      The values are encoded based on the `treys.Card` integer representation. There are 5 `int` in
      the list, where `-1` represents that there is no card present.
 
+### Credits
+Huge thanks to @BigBadBurrow for pointing out a ton of bugs!
+
 # Example
 
 Might be out of date.

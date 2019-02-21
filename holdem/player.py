@@ -41,7 +41,6 @@ class Player(object):
     self.hand = []
     self.stack = stack
     self.hand_starting_stack = self.stack
-    self.stack_for_street = self.stack
     self.currentbet = 0
     self.lastsidepot = 0
     self._seat = -1
@@ -69,7 +68,6 @@ class Player(object):
     self.currentbet = 0
     self.lastsidepot = 0
     self.hand_starting_stack = self.stack
-    self.stack_for_street = self.stack
     self.playing_hand = (self.stack != 0)
 
   def declare_action(self, bet_size):
@@ -78,7 +76,6 @@ class Player(object):
       return
     self.stack -= (bet_size - self.currentbet)
     self.currentbet = bet_size
-    self.stack_for_street = self.stack + self.currentbet
     if self.stack == 0:
       self.isallin = True
 
@@ -103,7 +100,8 @@ class Player(object):
   # cleanup
   def validate_action(self, table_state, action):
     self.update_localstate(table_state)
-    tocall = min(table_state.get('tocall', 0), self.stack_for_street)
+    stack_for_street = self.stack + self.currentbet
+    tocall = min(table_state.get('tocall', 0), stack_for_street)
     minraise = table_state.get('minraise', 0)
 
     [action_idx, raise_amount] = action
@@ -115,8 +113,8 @@ class Player(object):
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
           raise error.Error('raise must be at least minraise {}'.format(minraise))
-        if raise_amount > self.stack_for_street:
-          raise error.Error('raise must be at most maxraise {}'.format(self.stack_for_street))
+        if raise_amount > stack_for_street:
+          raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CHECK:
         move_tuple = ('check', 0)
@@ -128,8 +126,8 @@ class Player(object):
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
           raise error.Error('raise must be at least minraise {}'.format(minraise))
-        if raise_amount > self.stack_for_street:
-          raise error.Error('raise must be at most maxraise {}'.format(self.stack_for_street))
+        if raise_amount > stack_for_street:
+          raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CALL:
         move_tuple = ('call', tocall)
