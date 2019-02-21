@@ -87,13 +87,13 @@ class Player(object):
     self.blind = amount
     self.playedthisround = False
 
-  def refund(self, ammount):
-    self.stack += ammount
+  def refund(self, amount):
+    self.stack += amount
 
   def player_state(self):
     return (self.get_seat(), self.stack, self.playing_hand, self.betting, self.player_id)
 
-  def reset_stack(self, amount=2000):
+  def reset_stack(self, amount=2500):
     self.stack = amount
 
   def update_localstate(self, table_state):
@@ -114,9 +114,9 @@ class Player(object):
       assert action_idx in [Player.CHECK, Player.RAISE]
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
-          raise error.Error('raise must be greater than minraise {}'.format(minraise))
+          raise error.Error('raise must be at least minraise {}'.format(minraise))
         if raise_amount > self.stack_for_street:
-          raise error.Error('raise must be less than maxraise {}'.format(self.stack_for_street))
+          raise error.Error('raise must be at most maxraise {}'.format(self.stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CHECK:
         move_tuple = ('check', 0)
@@ -127,12 +127,12 @@ class Player(object):
         raise error.Error('invalid action ({}) must be raise (2), call (1), or fold (3)'.format(action_idx))
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
-          raise error.Error('raise must be greater than minraise {}'.format(minraise))
+          raise error.Error('raise must be at least minraise {}'.format(minraise))
         if raise_amount > self.stack_for_street:
-          raise error.Error('raise must be less than maxraise {}'.format(self.stack_for_street))
+          raise error.Error('raise must be at most maxraise {}'.format(self.stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CALL:
         move_tuple = ('call', tocall)
       elif action_idx == Player.FOLD:
-        move_tuple = ('fold', 0)
+        move_tuple = ('fold', self.currentbet)
     return move_tuple
