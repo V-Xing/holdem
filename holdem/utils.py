@@ -49,6 +49,7 @@ class player_table(IntEnum):
   HAS_ACTED = 3
   IS_ALL_IN = 4
   LAST_SIDEPOT = 5
+  ID = 6
 
 def format_action(player, action):
   color = False
