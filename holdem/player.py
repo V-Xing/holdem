@@ -40,8 +40,6 @@ class Player(object):
 
     self.hand = []
     self.starting_stack = stack
-    #self.stack = stack
-    #self.hand_starting_stack = self.stack
     self.currentbet = 0
     self.lastsidepot = 0
     self._seat = -1
@@ -64,7 +62,6 @@ class Player(object):
   def reset_hand(self):
     self._hand = []
     self.playedthisround = False
-    self.betting = False
     self.isallin = False
     self.currentbet = 0
     self.lastsidepot = 0
@@ -89,7 +86,7 @@ class Player(object):
     self.stack += amount
 
   def player_state(self):
-    return (self.get_seat(), self.stack, self.playing_hand, self.betting, self.player_id)
+    return (self.get_seat(), self.stack, self.playing_hand, self.player_id)
 
   def reset_stack(self, amount=None):
     if amount is None:
