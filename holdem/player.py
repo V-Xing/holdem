@@ -121,7 +121,7 @@ class Player(object):
           raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CHECK:
-        move_tuple = ('check', 0)
+        move_tuple = ('check', self.currentbet)
       else:
         raise error.Error('invalid action ({}) must be check (0) or raise (2)'.format(action_idx))
     else:
