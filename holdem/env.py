@@ -469,6 +469,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     self._dead_cards = []
     self._current_sidepot = 0
     self._totalpot = 0
+    self._last_actions = None
     self._side_pots = [0] * len(self._seats)
     self._deck.shuffle()
 
