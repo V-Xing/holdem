@@ -381,6 +381,46 @@ def test_min_max_bet():
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
     assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
 
+def test_preflop_allin_call():
+    # 2 Players
+    env = _create_env(2)
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN shoves
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 100])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 100
+    assert community_infos[community_table.POT] == env._bigblind * 101
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # BB calls
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == True
+    assert round(sum(r), 2) == (env._bigblind + env._smallblind) / env._bigblind
+    assert abs(i['money_won']) == 100 * env._bigblind
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 200
+    assert community_infos[community_table.BUTTON_POS] == 0
+
+    # Reset environment to play next hand
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
+    assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+
 # Private methods
 
 def _unpack_state(state):

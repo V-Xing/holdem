@@ -45,7 +45,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                       [150,300], [200,400], [300,600], [400,800], [500,10000],
                       [600,1200], [800,1600], [1000,2000]]
 
-  def __init__(self, n_seats, max_limit=100000, all_in_equity_reward=False, equity_steps=100, debug=False):
+  def __init__(self, n_seats, max_limit=100000, all_in_equity_reward=False, equity_steps=100, autoreset_stacks=True, debug=False):
     n_suits = 4                     # s,h,d,c
     n_ranks = 13                    # 2,3,4,5,6,7,8,9,T,J,Q,K,A
     n_pocket_cards = 2
@@ -81,6 +81,8 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
     self.equity_reward = all_in_equity_reward
     self.equity = Equity(n_evaluations=equity_steps)
+
+    self._autoreset_stacks = autoreset_stacks
 
     self.observation_space = spaces.Tuple([
       spaces.Tuple([                # players
@@ -450,6 +452,8 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     playing = 0
     for player in self._seats:
       if not player.emptyplayer and not player.sitting_out:
+        if self._autoreset_stacks:
+          player.reset_stack()
         player.reset_hand()
         playing += 1
     self.community = []
