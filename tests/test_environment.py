@@ -639,6 +639,131 @@ def test_check_on_big_blind():
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
     assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
 
+def test_blind_stealing():
+    for n_players in range(2, 11):
+        env = _create_env(n_players)
+
+        # BTN steals, others fold
+        player_infos, _, community_infos, _ = _reset_env(env)
+        done = False
+        iters = 0
+        while not done:
+            iters += 1
+            our_turn = community_infos[community_table.TO_ACT_POS] == 0
+            if our_turn:
+                move = [action_table.RAISE, 2 * env._bigblind]
+            else:
+                move = [action_table.FOLD, 0]
+            s, r, done, i = _step(env, move)
+            player_infos, _, community_infos, _ = _unpack_state(s)
+            expected_reward = [0] * n_players
+            if done:
+                btn_pos = 0
+                expected_reward[btn_pos] = (env._smallblind + env._bigblind) / env._bigblind
+                assert i['money_won'] == (env._bigblind if n_players == 2 else env._bigblind + env._smallblind)
+                # BTN==SB has won bb unless > 2 players, then BTN==BTN and won sb+bb
+                assert player_infos[0][player_table.STACK] == 101 * env._bigblind + (0 if n_players == 2 else  env._smallblind)
+                # BTN+1==SB has lost sb unless 2 players, then BTN+1==BB lost bb
+                assert player_infos[1][player_table.STACK] == (99 * env._bigblind if n_players == 2 else 100 * env._bigblind - env._smallblind)
+                # BTN+2==BB has lost bb unless 2 players, then BTN+2==BTN won sb
+                assert player_infos[2%n_players][player_table.STACK] == (99 * env._bigblind if n_players > 2 else 101 * env._bigblind)
+            else:
+                assert i['money_won'] == 0
+            assert r == expected_reward
+        assert iters == n_players
+
+        # CO steals, others fold
+        player_infos, _, community_infos, _ = _reset_env(env)
+        done = False
+        iters = 0
+        while not done:
+            iters += 1
+            our_turn = community_infos[community_table.TO_ACT_POS] == 0
+            if our_turn:
+                move = [action_table.RAISE, 2 * env._bigblind]
+            else:
+                move = [action_table.FOLD, 0]
+            s, r, done, i = _step(env, move)
+            player_infos, _, community_infos, _ = _unpack_state(s)
+            expected_reward = [0] * n_players
+            if done:
+                expected_reward[0] = (env._smallblind + env._bigblind) / env._bigblind
+                assert i['money_won'] == \
+                    (env._smallblind if n_players <= 3 else env._bigblind + env._smallblind)
+                # CO==BB has won sb unless >3 players, then CO==CO and won sb+bb
+                assert player_infos[0][player_table.STACK] == \
+                    100 * env._bigblind + (env._smallblind if n_players <= 3 else env._bigblind + env._smallblind)
+                # CO+1==SB lost sb if 2 players, else CO+1==BTN and folds
+                assert player_infos[1][player_table.STACK] == \
+                    (100 * env._bigblind - env._smallblind if n_players == 2 else 100 * env._bigblind)
+            else:
+                assert i['money_won'] == 0
+            assert r == expected_reward
+        assert iters == n_players - (1 if n_players <= 3 else 0)
+
+        # HJ steals, others fold
+        player_infos, _, community_infos, _ = _reset_env(env)
+        done = False
+        iters = 0
+        while not done:
+            iters += 1
+            our_turn = community_infos[community_table.TO_ACT_POS] == 0
+            if our_turn:
+                move = [action_table.RAISE, 2 * env._bigblind]
+            else:
+                move = [action_table.FOLD, 0]
+            s, r, done, i = _step(env, move)
+            player_infos, _, community_infos, _ = _unpack_state(s)
+            expected_reward = [0] * n_players
+            if done:
+                expected_reward[0] = (env._smallblind + env._bigblind) / env._bigblind
+                assert n_players == n_players and i['money_won'] == \
+                    (env._bigblind if n_players <= 3 else (env._smallblind if n_players == 4 else env._bigblind + env._smallblind))
+                # HJ==SB has won bb if <4 players, if 4 players HJ==BB and wins sb, else HJ==HJ and won sb+bb
+                assert n_players == n_players and player_infos[0][player_table.STACK] == \
+                    100 * env._bigblind + \
+                        (env._bigblind if n_players <= 3 else (env._smallblind if n_players == 4 else env._bigblind + env._smallblind))
+                # HJ+1==BB lost bb if <4 players, else HJ+1==CO and folds
+                assert n_players == n_players and player_infos[1][player_table.STACK] == \
+                    (100 * env._bigblind - (env._bigblind if n_players <= 3 else 0))
+            else:
+                assert i['money_won'] == 0
+            assert r == expected_reward
+        assert iters == n_players - (1 if n_players == 4 else 0)
+
+        # MP steals, others fold
+        player_infos, _, community_infos, _ = _reset_env(env)
+        done = False
+        iters = 0
+        while not done:
+            iters += 1
+            our_turn = community_infos[community_table.TO_ACT_POS] == 0
+            if our_turn:
+                move = [action_table.RAISE, 2 * env._bigblind]
+            else:
+                move = [action_table.FOLD, 0]
+            s, r, done, i = _step(env, move)
+            player_infos, _, community_infos, _ = _unpack_state(s)
+            expected_reward = [0] * n_players
+            if done:
+                assert n_players == n_players and \
+                    community_infos[community_table.POT] == \
+                        (env._smallblind if n_players != 4 else 0) + env._bigblind * (1 if (n_players == 2 or n_players == 5) else 3)
+                expected_reward[0] = (env._smallblind + env._bigblind) / env._bigblind
+                # MP==BB has won sb if 2 or 5 players, if 3 players MP==BTN and wins sb+bb, if 4 players MP==BB and wins bb, else MP==MP and won sb+bb
+                assert n_players == n_players and player_infos[0][player_table.STACK] == \
+                    100 * env._bigblind + \
+                        (env._smallblind if (n_players == 2 or n_players == 5) else (env._bigblind if n_players == 4 else env._bigblind + env._smallblind))
+                # MP+1==SB lost bb if <3 players, else HJ+1==CO and folds
+                assert n_players == n_players and player_infos[1][player_table.STACK] == \
+                    (100 * env._bigblind - (env._smallblind if n_players <= 3 else (env._bigblind if n_players == 4 else 0)))
+                assert n_players == n_players and i['money_won'] == \
+                    (env._smallblind if (n_players == 2 or n_players == 5) else (env._bigblind if n_players == 4 else env._bigblind + env._smallblind))
+            else:
+                assert i['money_won'] == 0
+            assert r == expected_reward
+        assert iters == n_players - (1 if (n_players == 2 or n_players == 5) else 0)
+
 ### test calling with less than 1bb left
 
 # Private methods
@@ -668,4 +793,6 @@ def _reset_env(env):
 
 def _step(env, move):
     actions = [move] * env.n_seats
-    return env.step(actions)
+    s, r, d, i = env.step(actions)
+    assert round(sum(r), 2) == (((env._bigblind + env._smallblind) / env._bigblind) if d else 0) # Sum of rewards need to be sum of blinds in big blinds
+    return s, r, d, i

@@ -65,6 +65,7 @@ class Player(object):
     self.isallin = False
     self.currentbet = 0
     self.lastsidepot = 0
+    self.blind = 0
     self.hand_starting_stack = self.stack
     self.playing_hand = (self.stack != 0)
 
