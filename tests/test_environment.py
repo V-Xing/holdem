@@ -40,11 +40,29 @@ def test_fold():
         iters = 0
         while not done:
             iters += 1
-            _, r, done, _ = _step(env, [action_table.FOLD, 0])
+            _, r, done, i = _step(env, [action_table.FOLD, 0])
             expected_reward = [0] * n_players
             if done:
                 bb_pos = 1 if n_players == 2 else 2
                 expected_reward[bb_pos] = (env._smallblind + env._bigblind) / env._bigblind
+                assert i['money_won'] == (-env._smallblind if n_players == 2 else 0)
+            else:
+                assert i['money_won'] == 0
+            assert r == expected_reward
+        assert iters == n_players - 1 # Last to act wins when everyone else folds
+        _reset_env(env)
+        done = False
+        iters = 0
+        while not done:
+            iters += 1
+            _, r, done, i = _step(env, [action_table.FOLD, 0])
+            expected_reward = [0] * n_players
+            if done:
+                bb_pos = 0 if n_players == 2 else 3 % n_players
+                expected_reward[bb_pos] = (env._smallblind + env._bigblind) / env._bigblind
+                assert i['money_won'] == (env._smallblind if (n_players == 2 or n_players == 3) else 0)
+            else:
+                assert i['money_won'] == 0
             assert r == expected_reward
         assert iters == n_players - 1 # Last to act wins when everyone else folds
 
