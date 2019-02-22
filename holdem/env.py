@@ -220,18 +220,18 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       players.remove(prev_player)
       self._folded_players.append(prev_player)
 
-    everyone_all_in = len(players) > 1 and all([player.isallin for player in players])
     everyone_played_this_round = all([player.playedthisround for player in players])
+    ready_for_showdown = len(players) > 1 and sum([player.isallin for player in players]) >= len(players) - 1 and everyone_played_this_round
 
-    if everyone_all_in and self.equity_reward:
-      self._street = Street.SHOWDOWN
+    if ready_for_showdown:
+      if self.equity_reward:
+        self._street = Street.SHOWDOWN
+      else:
+        while self._street < Street.SHOWDOWN:
+          self._deal_next_street()
 
     if everyone_played_this_round:
       self._resolve_street(players)
-
-    if everyone_all_in and not self.equity_reward:
-      while self._street < Street.SHOWDOWN:
-        self._deal_next_street()
 
     terminal = False
     if self._street == Street.SHOWDOWN or len(players) == 1:

@@ -440,6 +440,7 @@ def test_preflop_allin_call():
     assert community_infos[community_table.POT] == env._smallblind + env._bigblind
 
 def test_custom_stacks():
+    # 4 different stacks
     env = TexasHoldemEnv(4)
     env.add_player(0, stack=env._bigblind * 500)
     env.add_player(1, stack=env._bigblind * 40)
@@ -450,6 +451,60 @@ def test_custom_stacks():
     assert player_infos[2][player_table.STACK] == env._bigblind * 40 - env._smallblind
     assert player_infos[3][player_table.STACK] == env._bigblind * 99
     assert player_infos[0][player_table.STACK] == env._bigblind * 10
+
+    # 3 players, last one has bigger stack
+    env = TexasHoldemEnv(3, all_in_equity_reward=True)
+    env.add_player(0, stack=env._bigblind * 50)
+    env.add_player(1, stack=env._bigblind * 50)
+    env.add_player(2, stack=env._bigblind * 80)
+    player_infos, _, _, community_cards = _reset_env(env)
+    assert community_cards == [-1, -1, -1, -1, -1]
+    assert player_infos[0][player_table.STACK] == env._bigblind * 50 # BTN
+    assert player_infos[1][player_table.STACK] == env._bigblind * 50 - env._smallblind
+    assert player_infos[2][player_table.STACK] == env._bigblind * 79
+
+    # BTN shoves
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 50])
+    player_infos, _, community_infos, community_cards = _unpack_state(s)
+    assert r == [0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert community_cards == [-1, -1, -1, -1, -1]
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 51 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB calls
+    s, r, d, i = _step(env, [action_table.CALL, env._bigblind * 50])
+    player_infos, _, community_infos, community_cards = _unpack_state(s)
+    assert r == [0, 0, 0]
+    assert d == False
+    assert i['money_won'] == 0
+    assert community_cards == [-1, -1, -1, -1, -1]
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 101
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB calls all in and has stack left
+    s, r, d, i = _step(env, [action_table.CALL, env._bigblind * 50])
+    player_infos, _, community_infos, community_cards = _unpack_state(s)
+    assert d == True # Hand ends since only one player has stack left
+    assert round(sum(r), 2) == 1.4
+    assert community_cards == [-1, -1, -1, -1, -1]
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 150
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+
 
 def test_turn_passes_fold_and_all_in():
     # 4 Players
