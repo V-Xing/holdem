@@ -764,6 +764,80 @@ def test_blind_stealing():
             assert r == expected_reward
         assert iters == n_players - (1 if (n_players == 2 or n_players == 5) else 0)
 
+def test_card_dealing():
+    # 2 Players
+    env = _create_env(2)
+    _, player_hands, _, community_cards = _reset_env(env)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+    
+    # SB/BTN minraises
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 2])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+    
+    # BB calls
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards[3:] == [-1, -1]
+    assert community_cards[0] != -1 and community_cards[1] != -1 and community_cards[2] != -1
+
+    # FLOP
+    # BB minbets
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards[3:] == [-1, -1]
+    assert community_cards[0] != -1 and community_cards[1] != -1 and community_cards[2] != -1
+
+    # SB/BTN folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards[3:] == [-1, -1]
+    assert community_cards[0] != -1 and community_cards[1] != -1 and community_cards[2] != -1
+
+    # Reset environment to play next hand
+    _, player_hands, _, community_cards = _reset_env(env)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+
+    # SB folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+
+    # Reset environment to play next hand
+    _, player_hands, _, community_cards = _reset_env(env)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+    
+    # SB/BTN minraises
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 2])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+    
+    # BB folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    _, player_hands, _, community_cards = _unpack_state(s)
+    assert player_hands[0][0] != -1 and player_hands[0][1] != -1
+    assert player_hands[1][0] != -1 and player_hands[1][1] != -1
+    assert community_cards == [-1, -1, -1, -1, -1]
+
+
 ### test calling with less than 1bb left
 
 # Private methods

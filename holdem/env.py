@@ -288,7 +288,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
   def _resolve_street(self, players):
     self._current_player = self._first_to_act(players)
     self._resolve_sidepots(players + self._folded_players)
-    if self._street < Street.SHOWDOWN:
+    if self._street < Street.SHOWDOWN and len(players) > 1:
       self._reset_street_state()
       self._deal_next_street()
 
