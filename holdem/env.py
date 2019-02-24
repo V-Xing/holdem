@@ -220,8 +220,12 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       players.remove(prev_player)
       self._folded_players.append(prev_player)
 
-    everyone_played_this_round = all([player.playedthisround for player in players])
-    ready_for_showdown = len(players) > 1 and sum([player.isallin for player in players]) >= len(players) - 1 and everyone_played_this_round
+    not_acted_players = [player for player in players if not player.playedthisround]
+    all_but_one_all_in = sum([player.isallin for player in players]) >= len(players) - 1
+    street_done = all([player.playedthisround for player in players]) \
+                  or (len(not_acted_players) == 1 and not_acted_players[0].currentbet >= self._tocall and all_but_one_all_in)
+
+    ready_for_showdown = len(players) > 1 and all_but_one_all_in  and street_done
 
     if ready_for_showdown:
       if self.equity_reward:
@@ -230,7 +234,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         while self._street < Street.SHOWDOWN:
           self._deal_next_street()
 
-    if everyone_played_this_round:
+    if street_done:
       self._resolve_street(players)
 
     terminal = False
@@ -520,8 +524,8 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       int(self._bigblind),
       int(self._totalpot),
       int(self._lastraise),
-      int(min(max(self._bigblind, self._lastraise + self._tocall), self._current_player.stack)),
-      int(self._tocall - self._current_player.currentbet),
+      int(min(max(self._bigblind, self._lastraise + self._tocall), self._current_player.max_bet)),
+      int(self._tocall),# - self._current_player.currentbet),
       int(self._current_player.player_id),
     ], self._pad(self.community, 5, -1))
     return (tuple(player_states), community_states)

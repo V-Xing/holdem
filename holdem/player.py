@@ -53,6 +53,10 @@ class Player(object):
     self.playedthisround = False
     self.sitting_out = False # not used at the moment, but might become useful in the future
 
+  @property
+  def max_bet(self):
+    return self.currentbet + self.stack
+
   def get_seat(self):
     return self._seat
 
@@ -102,8 +106,8 @@ class Player(object):
   # cleanup
   def validate_action(self, table_state, action):
     self.update_localstate(table_state)
-    stack_for_street = self.stack + self.currentbet
-    tocall = min(table_state.get('tocall', 0), stack_for_street)
+    #stack_for_street = self.stack + self.currentbet
+    tocall = min(table_state.get('tocall', 0), self.max_bet)
     minraise = table_state.get('minraise', 0)
 
     [action_idx, raise_amount] = action
@@ -115,8 +119,8 @@ class Player(object):
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
           raise error.Error('raise must be at least minraise {}'.format(minraise))
-        if raise_amount > stack_for_street:
-          raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
+        if raise_amount > self.max_bet:
+          raise error.Error('raise must be at most maxraise {}'.format(self.max_bet))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CHECK:
         move_tuple = ('check', self.currentbet)
@@ -128,11 +132,11 @@ class Player(object):
       if action_idx == Player.RAISE:
         if raise_amount < minraise:
           raise error.Error('raise must be at least minraise {}'.format(minraise))
-        if raise_amount > stack_for_street:
-          raise error.Error('raise must be at most maxraise {}'.format(stack_for_street))
+        if raise_amount > self.max_bet:
+          raise error.Error('raise must be at most maxraise {}'.format(self.max_bet))
         move_tuple = ('raise', raise_amount)
       elif action_idx == Player.CALL:
-        move_tuple = ('call', min(tocall, stack_for_street))
+        move_tuple = ('call', min(tocall, self.max_bet))
       elif action_idx == Player.FOLD:
         move_tuple = ('fold', self.currentbet)
     return move_tuple
