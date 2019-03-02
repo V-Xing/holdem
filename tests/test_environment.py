@@ -298,7 +298,7 @@ def test_bet_sizes_3_player():
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous SB is now BTN
     assert community_infos[community_table.TO_ACT_POS] == 1 # BTN acts first 3-way
 
-def test_min_max_bet():
+def test_min_max_bet_2_player():
     # 2 Players
     env = _create_env(2)
     player_infos, _, community_infos, _ = _reset_env(env)
@@ -308,7 +308,11 @@ def test_min_max_bet():
     assert community_infos[community_table.TO_ACT_POS] == 0
 
     # BTN minraises
-    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 2])
+    minraise = community_infos[community_table.MINRAISE]
+    last_raise = community_infos[community_table.LAST_RAISE]
+    assert last_raise == env._bigblind
+    assert minraise == env._bigblind * 2
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
     player_infos, _, community_infos, _ = _unpack_state(s)
     assert r == [0, 0]
     assert d == False
@@ -320,7 +324,8 @@ def test_min_max_bet():
     assert community_infos[community_table.TO_ACT_POS] == 1
 
     # BB minraises
-    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 3])
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
     player_infos, _, community_infos, _ = _unpack_state(s)
     assert r == [0, 0]
     assert d == False
@@ -356,7 +361,8 @@ def test_min_max_bet():
     assert community_infos[community_table.TO_ACT_POS] == 0
 
     # BTN raises from 50 to 90 bb
-    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 90])
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
     player_infos, _, community_infos, _ = _unpack_state(s)
     assert r == [0, 0]
     assert d == False
@@ -368,7 +374,8 @@ def test_min_max_bet():
     assert community_infos[community_table.TO_ACT_POS] == 1
 
     # BB shoves 100 bb
-    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 100])
+    max_bet = player_infos[0][player_table.CURRENT_BET] + player_infos[0][player_table.STACK]
+    s, r, d, i = _step(env, [action_table.RAISE, max_bet])
     player_infos, _, community_infos, _ = _unpack_state(s)
     assert r == [0, 0]
     assert d == False
@@ -392,11 +399,305 @@ def test_min_max_bet():
 
     # Reset environment to play next hand
     player_infos, _, community_infos, _ = _reset_env(env)
+    minraise = community_infos[community_table.MINRAISE]
+    last_raise = community_infos[community_table.LAST_RAISE]
+    assert last_raise == env._bigblind
+    assert minraise == env._bigblind * 2
     assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
     assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
     assert community_infos[community_table.POT] == env._smallblind + env._bigblind
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
     assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
+
+def test_min_max_bet_3_player():
+    # 2 Players
+    env = _create_env(3)
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN minraises
+    minraise = community_infos[community_table.MINRAISE]
+    assert minraise == env._bigblind * 2
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 2
+    assert community_infos[community_table.POT] == env._bigblind * 3 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB minraises
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 2
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 3
+    assert community_infos[community_table.POT] == env._bigblind * 6
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB minraises
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 2
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 3
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 4
+    assert community_infos[community_table.POT] == env._bigblind * 9
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN flats
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 3
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 4
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 4
+    assert community_infos[community_table.POT] == env._bigblind * 11
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB flats
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 12
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB bets 10
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 10])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 10
+    assert community_infos[community_table.POT] == env._bigblind * 22
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB raises to 50
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 50])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 10
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 72
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN raises to 90
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 10
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 90
+    assert community_infos[community_table.POT] == env._bigblind * 162
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB shoves
+    max_bet = player_infos[0][player_table.CURRENT_BET] + player_infos[0][player_table.STACK]
+    s, r, d, i = _step(env, [action_table.RAISE, max_bet])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 50
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 90
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 96
+    assert community_infos[community_table.POT] == env._bigblind * 248
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 90
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 96
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 50
+    assert community_infos[community_table.POT] == env._bigblind * 248
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [-94, (148 * env._bigblind + env._smallblind) / env._bigblind, -53]
+    assert d == True
+    assert i['money_won'] == -94 * env._bigblind
+
+    # Reset environment to play next hand
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.BUTTON_POS] == 1
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+def test_min_max_bet_3_player_alternative():
+
+    # 2 Players
+    env = _create_env(3)
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN minraises
+    minraise = community_infos[community_table.MINRAISE]
+    assert minraise == env._bigblind * 2
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 2
+    assert community_infos[community_table.POT] == env._bigblind * 3 + env._smallblind
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB minraises
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 2
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 3
+    assert community_infos[community_table.POT] == env._bigblind * 6
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB minraises
+    minraise = community_infos[community_table.MINRAISE]
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 2
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 3
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 4
+    assert community_infos[community_table.POT] == env._bigblind * 9
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN flats
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 3
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 4
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 4
+    assert community_infos[community_table.POT] == env._bigblind * 11
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB flats
+    s, r, d, i = _step(env, [action_table.CALL, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._bigblind * 12
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB bets 10
+    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind * 10])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 10
+    assert community_infos[community_table.POT] == env._bigblind * 22
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB minraises
+    minraise = community_infos[community_table.MINRAISE]
+    last_raise = community_infos[community_table.LAST_RAISE]
+    assert last_raise == env._bigblind * 10
+    assert minraise == env._bigblind * 20
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 10
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 20
+    assert community_infos[community_table.POT] == env._bigblind * 42
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN minraises
+    minraise = community_infos[community_table.MINRAISE]
+    assert minraise == env._bigblind * 30
+    s, r, d, i = _step(env, [action_table.RAISE, minraise])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 10
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 20
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 30
+    assert community_infos[community_table.POT] == env._bigblind * 72
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 1
+
+    # SB shoves
+    max_bet = player_infos[0][player_table.CURRENT_BET] + player_infos[0][player_table.STACK]
+    s, r, d, i = _step(env, [action_table.RAISE, max_bet])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 20
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 30
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 96
+    assert community_infos[community_table.POT] == env._bigblind * 158
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 2
+
+    # BB folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert d == False
+    assert player_infos[0][player_table.CURRENT_BET] == env._bigblind * 30
+    assert player_infos[1][player_table.CURRENT_BET] == env._bigblind * 96
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind * 20
+    assert community_infos[community_table.POT] == env._bigblind * 158
+    assert community_infos[community_table.BUTTON_POS] == 0
+    assert community_infos[community_table.TO_ACT_POS] == 0
+
+    # BTN folds
+    s, r, d, i = _step(env, [action_table.FOLD, 0])
+    player_infos, _, community_infos, _ = _unpack_state(s)
+    assert r == [-34, (58 * env._bigblind + env._smallblind) / env._bigblind, -23]
+    assert d == True
+    assert i['money_won'] == -34 * env._bigblind
+
+    # Reset environment to play next hand
+    player_infos, _, community_infos, _ = _reset_env(env)
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == env._smallblind
+    assert player_infos[2][player_table.CURRENT_BET] == env._bigblind
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.BUTTON_POS] == 1
+    assert community_infos[community_table.TO_ACT_POS] == 1
 
 def test_preflop_allin_call():
     # 2 Players
@@ -433,6 +734,10 @@ def test_preflop_allin_call():
 
     # Reset environment to play next hand
     player_infos, _, community_infos, _ = _reset_env(env)
+    minraise = community_infos[community_table.MINRAISE]
+    last_raise = community_infos[community_table.LAST_RAISE]
+    assert last_raise == env._bigblind
+    assert minraise == env._bigblind * 2
     assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
     assert community_infos[community_table.TO_ACT_POS] == 1 # SB/BTN acts first heads-up
     assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
@@ -624,6 +929,18 @@ def test_turn_passes_fold_and_all_in():
     assert player_infos[2][player_table.CURRENT_BET] == 0
     assert player_infos[3][player_table.CURRENT_BET] == 0
     assert community_infos[community_table.BUTTON_POS] == 0
+
+    # Reset environment to play next hand
+    player_infos, _, community_infos, _ = _reset_env(env)
+    minraise = community_infos[community_table.MINRAISE]
+    last_raise = community_infos[community_table.LAST_RAISE]
+    assert last_raise == env._bigblind
+    assert minraise == env._bigblind * 2
+    assert player_infos[0][player_table.CURRENT_BET] == 0
+    assert player_infos[1][player_table.CURRENT_BET] == 0
+    assert community_infos[community_table.POT] == env._smallblind + env._bigblind
+    assert community_infos[community_table.BUTTON_POS] == 1 # Previous BB is now BTN/SB
+    assert community_infos[community_table.TO_ACT_POS] == 0 # SB/BTN acts first heads-up
 
 def test_check_on_big_blind():
     # 2 Players
@@ -898,10 +1215,19 @@ def test_under_bb_bets():
     env.add_player(2, stack=env._bigblind * 5)
     player_infos, _, community_infos, community_cards = _reset_env(env)
     assert community_cards == [-1, -1, -1, -1, -1]
-    assert community_infos[community_table.MINRAISE] == env._smallblind
     assert player_infos[0][player_table.STACK] == env._smallblind # BTN
     assert player_infos[1][player_table.STACK] == env._bigblind - env._smallblind
     assert player_infos[2][player_table.STACK] == env._bigblind * 4
+    
+    # raise should be illegal if less than minraise stack
+    minraise = community_infos[community_table.MINRAISE]
+    failed = False
+    assert minraise > player_infos[0][player_table.CURRENT_BET] + player_infos[0][player_table.STACK]
+    try:
+        _step(env, [action_table.RAISE, minraise])
+    except:
+        failed = True
+    assert failed
 
     # BTN shoves
     s, r, d, i = _step(env, [action_table.CALL, env._smallblind])
@@ -910,7 +1236,6 @@ def test_under_bb_bets():
     assert d == False
     assert i['money_won'] == 0
     assert community_cards == [-1, -1, -1, -1, -1]
-    assert community_infos[community_table.MINRAISE] == env._bigblind
     assert player_infos[0][player_table.CURRENT_BET] == env._smallblind
     assert player_infos[1][player_table.CURRENT_BET] == env._bigblind
     assert player_infos[2][player_table.CURRENT_BET] == env._smallblind
@@ -918,8 +1243,20 @@ def test_under_bb_bets():
     assert community_infos[community_table.BUTTON_POS] == 0
     assert community_infos[community_table.TO_ACT_POS] == 1
 
+    minraise = community_infos[community_table.MINRAISE]
+    assert minraise 
+
+    # raise should be illegal if less than minraise stack
+    failed = False
+    assert minraise > player_infos[0][player_table.CURRENT_BET] + player_infos[0][player_table.STACK]
+    try:
+        _step(env, [action_table.RAISE, minraise])
+    except:
+        failed = True
+    assert failed
+
     # SB calls
-    s, r, d, i = _step(env, [action_table.RAISE, env._bigblind])
+    s, r, d, i = _step(env, [action_table.CALL, 0])
     player_infos, _, community_infos, community_cards = _unpack_state(s)
     assert d == True # Hand ends since only one player has stack left
     assert round(sum(r), 2) == 1.4

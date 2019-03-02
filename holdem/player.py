@@ -99,16 +99,8 @@ class Player(object):
     else:
       self.stack = amount
 
-  def update_localstate(self, table_state):
-    self.stack = table_state.get('stack')
-    self.hand = table_state.get('pocket_cards')
-
-  # cleanup
-  def validate_action(self, table_state, action):
-    self.update_localstate(table_state)
-    #stack_for_street = self.stack + self.currentbet
-    tocall = min(table_state.get('tocall', 0), self.max_bet)
-    minraise = table_state.get('minraise', 0)
+  def validate_action(self, tocall, minraise, action):
+    tocall = min(tocall, self.max_bet)
 
     [action_idx, raise_amount] = action
     raise_amount = int(raise_amount)
