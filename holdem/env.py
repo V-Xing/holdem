@@ -245,13 +245,23 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     return self._get_current_step_returns(terminal)
 
   def _compute_equities(self, players):
-    equities = self.equity.get_equities([p.hand for p in players], self.community, self._deck.cards, self._dead_cards)
-    for i, p in enumerate(players):
-      p.equity = equities[i]
-      #print(p.equity)
+    return self.equity.get_equities([p.hand for p in players], self.community,
+                                    self._deck.cards, self._dead_cards)
+
+  def _compute_my_equity(self, player):
+    return self.equity.get_my_equity([player.hand], len(self._seats),
+                                     self.community, self._deck.cards)
 
   def render(self, mode='human', close=False):
-    self._compute_equities(self._playing_players)
+    # Equity knowing everyone else's cards
+    # equities = self._compute_equities(self._playing_players)
+    # for i, p in enumerate(self._playing_players):
+    #   p.equity = equities[i]
+
+    # Equity knowing only own cards
+    for p in self._playing_players:
+      p.equity = self._compute_my_equity(p)
+
     print('\ntotal pot: {}'.format(self._totalpot))
     if self._last_actions is not None:
       pid = self._last_player.player_id
