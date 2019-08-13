@@ -38,15 +38,10 @@ def play_out_hand(env, n_seats):
     (player_states, (community_infos, community_cards)), rews, terminal, info = env.step(actions)
     env.render(mode='human')
 
-env = gym.make('TexasHoldem-v1') # holdem.TexasHoldemEnv(2)
+env = gym.make('TexasHoldem-v1', n_seats=2, equity_steps=10000) # holdem.TexasHoldemEnv(2)
 
 # start with 2 players
 env.add_player(0, stack=2000) # add a player to seat 0 with 2000 "chips"
 env.add_player(1, stack=2000) # add another player to seat 1 with 2000 "chips"
 # play out a hand
-play_out_hand(env, env.n_seats)
-
-# add one more player
-env.add_player(2, stack=2000) # add another player to seat 1 with 2000 "chips"
-# play out another hand
 play_out_hand(env, env.n_seats)

@@ -39,12 +39,16 @@ class Player(object):
     self.player_id = player_id
 
     self.hand = []
+    self.stack = stack
     self.starting_stack = stack
+    self.hand_starting_stack = stack
     self.currentbet = 0
     self.lastsidepot = 0
     self._seat = -1
     self.handrank = -1
     self.blind = 0
+
+    self.equity = 0
 
     # flags for table management
     self.emptyplayer = emptyplayer
@@ -106,7 +110,7 @@ class Player(object):
     raise_amount = int(raise_amount)
     action_idx = int(action_idx)
 
-    if tocall - self.currentbet == 0:
+    if tocall == 0:
       assert action_idx in [Player.CHECK, Player.RAISE]
       if action_idx == Player.RAISE:
         if raise_amount < minraise:

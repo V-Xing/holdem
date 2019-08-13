@@ -244,9 +244,15 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
     return self._get_current_step_returns(terminal)
 
+  def _compute_equities(self, players):
+    equities = self.equity.get_equities([p.hand for p in players], self.community, self._deck.cards, self._dead_cards)
+    for i, p in enumerate(players):
+      p.equity = equities[i]
+      #print(p.equity)
+
   def render(self, mode='human', close=False):
-    print('<=============== Next Move ===============>')
-    print('total pot: {}'.format(self._totalpot))
+    self._compute_equities(self._playing_players)
+    print('\ntotal pot: {}'.format(self._totalpot))
     if self._last_actions is not None:
       pid = self._last_player.player_id
       print('last action by player {}:'.format(pid))
@@ -264,7 +270,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       idx_relative = (idx + self._current_player.player_id) % len(self._seats)
       position_string = self._get_blind_str(blinds_idxs, idx_relative)
       folded = "F" if not player_infos[idx][player_table.IS_IN_POT] else " "
-      print('{} {} {}{}stack: {}'.format(idx_relative, position_string, folded, hand_to_str(hand), self._seats[idx_relative].stack))
+      print('{} {} {}{}stack: {}, equity: {}'.format(idx_relative, position_string, folded, hand_to_str(hand), self._seats[idx_relative].stack, self._seats[idx_relative].equity))
 
   def _get_blind_str(self, blinds_idxs, idx):
     if idx == blinds_idxs[0]:
@@ -300,10 +306,13 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     if self._street == Street.NOT_STARTED:
       self._deal()
     elif self._street == Street.PREFLOP:
+      print('\n<=============== Flop ===============>')
       self._flop()
     elif self._street == Street.FLOP:
+      print('\n<=============== Turn ===============>')
       self._turn()
     elif self._street == Street.TURN:
+      print('\n<=============== River ===============>')
       self._river()
     self._street += 1
 
@@ -422,7 +431,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
     else:
       # trim side_pots to only include the non-empty side pots
       temp_pots = [pot for pot in self._side_pots if pot > 0]
-      
+
       if self.equity_reward and len(self.community) < 5:
         for pot_idx,_ in enumerate(temp_pots):
           # find players involved in given side_pot, compute the equities and pot split
@@ -490,7 +499,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       self._button = (self._button + 1) % len(self._seats)
       while not self._seats[self._button].playing_hand:
         self._button = (self._button + 1) % len(self._seats)
-  
+
   @property
   def _minraise(self):
     minraise = min(self._current_bet + self._lastraise, self._current_player.max_bet)
@@ -509,6 +518,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
       player_features = [
         int(player.currentbet),
         int(player.stack),
+        int(player.equity),
         int(player.playing_hand),
         int(player.playedthisround),
         int(player.isallin),
