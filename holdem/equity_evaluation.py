@@ -23,13 +23,9 @@
 # THE SOFTWARE.
 
 import numpy as np
-from multiprocessing.pool import ThreadPool
-from multiprocessing import cpu_count
-from threading import Thread
 
 from treys import Card, Deck, Evaluator
 
-import os
 import ctypes
 import ctypes.util
 import sys
@@ -127,7 +123,8 @@ class Equity():
                                            size=(5 - len(cur_community)),
                                            replace=False).tolist()
             cur_community += added_cards
-            ranks = [self.evaluator.evaluate(hand, cur_community) for hand in hands]
+            ranks = [self.evaluator.evaluate(
+                hand, cur_community) for hand in hands]
             winners = ranks == np.min(ranks)
             victories[winners] += 1 / winners.sum()
         equities = victories / self.n_evaluations
@@ -149,15 +146,18 @@ class Equity():
             cur_community += added_cards[:nb_add_comm]
             # Add cards for other players
             for i in range(n_players-1):
-                hands.append(added_cards[nb_add_comm + 2*i:nb_add_comm + 2*(i+1)])
+                hands.append(
+                    added_cards[nb_add_comm + 2*i:nb_add_comm + 2*(i+1)])
             # Compute ranks of each hand
-            ranks = [self.evaluator.evaluate(hand, cur_community) for hand in hands]
+            ranks = [self.evaluator.evaluate(
+                hand, cur_community) for hand in hands]
             # Compute best hands (winners[i] == 1, ties can exist)
             winners = ranks == np.min(ranks)
             # If I won, increment number of victories
             if winners[0]:
                 victories += 1 / winners.sum()
         return victories / self.n_evaluations
+
 
 if __name__ == '__main__':
     deck = Deck()
@@ -171,12 +171,14 @@ if __name__ == '__main__':
 
     start = time.time()
     equities = equity._get_equities_python(cards, board, deck.cards)
-    print(Card.print_pretty_card(card1), Card.print_pretty_card(card2), 'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
+    print(Card.print_pretty_card(card1), Card.print_pretty_card(card2),
+          'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
     print(equities)
     print('Python takes %ss' % (time.time() - start,))
 
     start = time.time()
     equities = equity._get_equities_c(cards, board, dead)
-    print(Card.print_pretty_card(card1), Card.print_pretty_card(card2), 'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
+    print(Card.print_pretty_card(card1), Card.print_pretty_card(card2),
+          'VS', Card.print_pretty_card(card3), Card.print_pretty_card(card4))
     print(equities)
     print('C takes %ss' % (time.time() - start,))
