@@ -167,8 +167,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                     raise error.Error('Agent already exists')
                 self.agent_exists = True
                 self.agent_id = player_id
-            new_player = Player(player_id, stack=stack, emptyplayer=False,
-                                is_agent=is_agent)
+            new_player = Player(player_id, stack=stack, emptyplayer=False)
             if self._seats[player_id].emptyplayer:
                 self._seats[player_id] = new_player
                 new_player.set_seat(player_id)
@@ -294,6 +293,9 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                                          self.community, self._deck.cards)
 
     def render(self, mode='human', close=False):
+        for p in self._playing_players:
+            p.equity = self._compute_my_equity(p)
+
         print('\ntotal pot: {}'.format(self._totalpot))
         if self._last_action is not None:
             pid = self._last_player.player_id

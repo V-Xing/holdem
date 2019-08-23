@@ -32,8 +32,7 @@ class Player(object):
     RAISE = 2
     FOLD = 3
 
-    def __init__(self, player_id, stack=2500, emptyplayer=False,
-                 is_agent=False):
+    def __init__(self, player_id, stack=2500, emptyplayer=False):
         self.player_id = player_id
 
         self.hand = []
@@ -47,7 +46,6 @@ class Player(object):
         self.blind = 0
 
         self.equity = 0
-        self.is_agent = is_agent
 
         # flags for table management
         self.emptyplayer = emptyplayer
