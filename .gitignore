@@ -3,5 +3,6 @@
 /build
 /test
 /examples
+/saved_models
 __pycache__
 *.DS_Store

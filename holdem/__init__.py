@@ -2,7 +2,7 @@
 from gym.envs.registration import register
 
 from .env import TexasHoldemEnv
-from .utils import card_to_str, hand_to_str, safe_actions, action_table
+from .utils import card_to_str, hand_to_str, safe_action, action_table
 
 register(
  	id='TexasHoldem-v0',

@@ -109,10 +109,6 @@ def hand_to_str(hand):
     return output
 
 
-def safe_actions(community_infos, n_seats):
-    current_player = community_infos[-1]
-    to_call = community_infos[-2]
-    actions = [[action_table.CHECK, action_table.NA]] * n_seats
-    if to_call > 0:
-        actions[current_player] = [action_table.CALL, action_table.NA]
-    return actions
+def safe_action(current_player, to_call, n_seats):
+    return ([action_table.CALL, action_table.NA] if to_call > 0
+            else [action_table.CHECK, action_table.NA])

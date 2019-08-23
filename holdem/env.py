@@ -21,6 +21,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+
 from enum import IntEnum
 
 from gym import Env, error, spaces, utils
@@ -50,10 +51,10 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
     def __init__(self, n_seats, max_limit=100000, all_in_equity_reward=False,
                  equity_steps=100, autoreset_stacks=True, debug=False):
-        n_suits = 4                     # s,h,d,c
-        n_ranks = 13                    # 2,3,4,5,6,7,8,9,T,J,Q,K,A
-        n_pocket_cards = 2
-        n_stud = 5
+        # n_suits = 4                     # s,h,d,c
+        # n_ranks = 13                    # 2,3,4,5,6,7,8,9,T,J,Q,K,A
+        # n_pocket_cards = 2
+        # n_stud = 5
 
         self.n_seats = n_seats
 
@@ -83,69 +84,91 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         self._current_player = None
         self._debug = debug
         self._last_player = None
-        self._last_actions = None
+        self._last_action = None
+
+        self.agent_exists = False
 
         self.equity_reward = all_in_equity_reward
         self.equity = Equity(n_evaluations=equity_steps)
 
         self._autoreset_stacks = autoreset_stacks
 
-        self.observation_space = spaces.Tuple([  # <--- This thing is totally broken!!!
-            spaces.Tuple([                # players
-                spaces.MultiDiscrete([
-                    1,                   # emptyplayer
-                    n_seats - 1,         # seat
-                    max_limit,           # stack
-                    1,                   # is_playing_hand
-                    max_limit,           # handrank
-                    1,                   # playedthisround
-                    1,                   # is_betting
-                    1,                   # isallin
-                    max_limit,           # last side pot
-                ]),
-                spaces.Tuple([
-                    spaces.MultiDiscrete([    # hand
-                        # suit, can be negative one if it's not avaiable.
-                        n_suits,
-                        # rank, can be negative one if it's not avaiable.
-                        n_ranks,
-                    ])
-                ] * n_pocket_cards)
-            ] * n_seats),
-            spaces.Tuple([
-                spaces.Discrete(n_seats - 1),  # big blind location
-                spaces.Discrete(max_limit),   # small blind
-                spaces.Discrete(max_limit),   # big blind
-                spaces.Discrete(max_limit),   # pot amount
-                spaces.Discrete(max_limit),   # last raise
-                spaces.Discrete(max_limit),   # minimum amount to raise
-                # how much needed to call by current player.
-                spaces.Discrete(max_limit),
-                spaces.Discrete(n_seats - 1),  # current player seat location.
-                spaces.MultiDiscrete([        # community cards
-                    n_suits - 1,          # suit
-                    n_ranks - 1,          # rank
-                    1,                     # is_flopped
-                ]),
-            ] * n_stud),
-        ])
+        # self.observation_space = spaces.Tuple([  # <--- This thing is totally broken!!!
+        #     spaces.Tuple([                # players
+        #         spaces.MultiDiscrete([
+        #             1,                   # emptyplayer
+        #             n_seats - 1,         # seat
+        #             max_limit,           # stack
+        #             1,                   # is_playing_hand
+        #             max_limit,           # handrank
+        #             1,                   # playedthisround
+        #             1,                   # is_betting
+        #             1,                   # isallin
+        #             max_limit,           # last side pot
+        #         ]),
+        #         spaces.Tuple([
+        #             spaces.MultiDiscrete([    # hand
+        #                 # suit, can be negative one if it's not avaiable.
+        #                 n_suits,
+        #                 # rank, can be negative one if it's not avaiable.
+        #                 n_ranks,
+        #             ])
+        #         ] * n_pocket_cards)
+        #     ] * n_seats),
+        #     spaces.Tuple([
+        #         spaces.Discrete(n_seats - 1),  # big blind location
+        #         spaces.Discrete(max_limit),   # small blind
+        #         spaces.Discrete(max_limit),   # big blind
+        #         spaces.Discrete(max_limit),   # pot amount
+        #         spaces.Discrete(max_limit),   # last raise
+        #         spaces.Discrete(max_limit),   # minimum amount to raise
+        #         # how much needed to call by current player.
+        #         spaces.Discrete(max_limit),
+        #         spaces.Discrete(n_seats - 1),  # current player seat location.
+        #         spaces.MultiDiscrete([        # community cards
+        #             n_suits - 1,          # suit
+        #             n_ranks - 1,          # rank
+        #             1,                     # is_flopped
+        #         ]),
+        #     ] * n_stud),
+        # ])
+        # self.action_space = spaces.Tuple([
+        #     spaces.MultiDiscrete([
+        #         3,                     # action_id
+        #         max_limit,             # raise_amount
+        #     ]),
+        # ] * n_seats)
+        self.observation_space = spaces.Tuple([
+                            spaces.Box(low=0.0, high=1.0, shape=(1,)),  # equity
+                            spaces.Discrete(max_limit),  # stack
+                            spaces.Discrete(max_limit),  # pot amount
+                            ])
 
-        self.action_space = spaces.Tuple([
-            spaces.MultiDiscrete([
-                3,                     # action_id
-                max_limit,             # raise_amount
-            ]),
-        ] * n_seats)
+        self.action_space = spaces.MultiDiscrete([3, max_limit])
+
+    @property
+    def current_player_id(self):
+        return self._current_player.player_id
+
+    @property
+    def tocall(self):
+        return self._tocall
 
     def seed(self, seed=None):
         _, seed = seeding.np_random(seed)
         return [seed]
 
-    def add_player(self, seat_id, stack=2500):
+    def add_player(self, seat_id, stack=2500, is_agent=False):
         """Add a player to the environment seat with the given stack (chipcount)"""
         player_id = seat_id
         if player_id not in self._player_dict:
-            new_player = Player(player_id, stack=stack, emptyplayer=False)
+            if is_agent:
+                if self.agent_exists:
+                    raise error.Error('Agent already exists')
+                self.agent_exists = True
+                self.agent_id = player_id
+            new_player = Player(player_id, stack=stack, emptyplayer=False,
+                                is_agent=is_agent)
             if self._seats[player_id].emptyplayer:
                 self._seats[player_id] = new_player
                 new_player.set_seat(player_id)
@@ -183,7 +206,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
             self._deal_next_street()
         return self._get_current_reset_returns()
 
-    def step(self, actions):
+    def step(self, action):
         """
         CHECK = 0
         CALL = 1
@@ -192,9 +215,6 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
         RAISE_AMT = [0, minraise]
         """
-        if len(actions) != len(self._seats):
-            raise error.Error('actions must be same shape as number of seats.')
-
         if self._current_player is None:
             raise error.Error(
                 'Round cannot be played without 2 or more players.')
@@ -212,12 +232,14 @@ class TexasHoldemEnv(Env, utils.EzPickle):
 
         if self._current_player.isallin:
             raise error.Error(
-                'This should never happen, position to act should pass players that can\'t take any actions')
+                'This should never happen, position to act should pass players'
+                'that can\'t take any actions')
 
-        self._last_actions = actions
+        self._current_player.equity = self._compute_my_equity(self._current_player)
+        self._last_action = action
 
         move = self._current_player.validate_action(
-            self._tocall, self._minraise, actions[self._current_player.player_id])
+            self._tocall, self._minraise, action)
         if self._debug:
             print('Player', self._current_player.player_id, move)
         self._player_action(self._current_player, move[1])
@@ -237,10 +259,13 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         all_but_one_all_in = sum(
             [player.isallin for player in players]) >= len(players) - 1
         street_done = all([player.playedthisround for player in players]) \
-            or (len(not_acted_players) == 1 and not_acted_players[0].currentbet >= self._tocall and all_but_one_all_in)
+            or (len(not_acted_players) == 1
+                and not_acted_players[0].currentbet >= self._tocall
+                and all_but_one_all_in)
 
-        ready_for_showdown = len(
-            players) > 1 and all_but_one_all_in and street_done
+        ready_for_showdown = (len(players) > 1
+                              and all_but_one_all_in
+                              and street_done)
 
         if ready_for_showdown:
             if self.equity_reward:
@@ -269,20 +294,11 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                                          self.community, self._deck.cards)
 
     def render(self, mode='human', close=False):
-        # Equity knowing everyone else's cards
-        # equities = self._compute_equities(self._playing_players)
-        # for i, p in enumerate(self._playing_players):
-        #   p.equity = equities[i]
-
-        # Equity knowing only own cards
-        for p in self._playing_players:
-            p.equity = self._compute_my_equity(p)
-
         print('\ntotal pot: {}'.format(self._totalpot))
-        if self._last_actions is not None:
+        if self._last_action is not None:
             pid = self._last_player.player_id
             print('last action by player {}:'.format(pid))
-            print(format_action(self._last_player, self._last_actions[pid]))
+            print(format_action(self._last_player, self._last_action))
 
         (player_states, community_states) = self._get_current_state()
         (player_infos, player_hands) = zip(*player_states)
@@ -297,8 +313,10 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                 idx + self._current_player.player_id) % len(self._seats)
             position_string = self._get_blind_str(blinds_idxs, idx_relative)
             folded = "F" if not player_infos[idx][player_table.IS_IN_POT] else " "
-            print('{} {} {}{}stack: {}, equity: {}'.format(idx_relative, position_string, folded, hand_to_str(
-                hand), self._seats[idx_relative].stack, self._seats[idx_relative].equity))
+            print('{} {} {}{}stack: {}, equity: {}'.format(idx_relative,
+                  position_string, folded, hand_to_str(hand),
+                  self._seats[idx_relative].stack,
+                  self._seats[idx_relative].equity))
 
     def _get_blind_str(self, blinds_idxs, idx):
         if idx == blinds_idxs[0]:
@@ -334,13 +352,10 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         if self._street == Street.NOT_STARTED:
             self._deal()
         elif self._street == Street.PREFLOP:
-            print('\n<=============== Flop ===============>')
             self._flop()
         elif self._street == Street.FLOP:
-            print('\n<=============== Turn ===============>')
             self._turn()
         elif self._street == Street.TURN:
-            print('\n<=============== River ===============>')
             self._river()
         self._street += 1
 
@@ -406,8 +421,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
             return self._next(players, self._seats[self._button])
 
     def _next(self, players, current_player):
-        players = [
-            player for player in players if not player.isallin or player is current_player]
+        players = [p for p in players if not p.isallin or p is current_player]
         idx = players.index(current_player)
         return players[(idx+1) % len(players)]
 
@@ -441,8 +455,9 @@ class TexasHoldemEnv(Env, utils.EzPickle):
                 p.currentbet = 0
             return
 
-        smallest_players_allin = [p for p, bet in zip(
-            players, [p.currentbet for p in players]) if bet == smallest_bet and p.isallin]
+        smallest_players_allin = [p for p, bet in
+                                  zip(players, [p.currentbet for p in players])
+                                  if bet == smallest_bet and p.isallin]
 
         for p in players:
             self._side_pots[self._current_sidepot] += min(
@@ -539,7 +554,7 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         self._dead_cards = []
         self._current_sidepot = 0
         self._totalpot = 0
-        self._last_actions = None
+        self._last_action = None
         self._side_pots = [0] * len(self._seats)
         self._deck.shuffle()
 
@@ -558,6 +573,9 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         if (not l) or (l is None):
             l = []
         return l + [v] * (n - len(l))
+
+    def _get_current_player_state(self, player):
+        return (self._compute_my_equity(player), player.stack, self._totalpot)
 
     def _get_current_state(self):
         player_states = []
@@ -590,14 +608,15 @@ class TexasHoldemEnv(Env, utils.EzPickle):
         return (tuple(player_states), community_states)
 
     def _get_current_reset_returns(self):
-        return self._get_current_state()
+        observation, _, _, _ = self._get_current_step_returns(terminal=False)
+        return observation, self._get_current_state()
 
     def _get_current_step_returns(self, terminal):
-        observation = self._get_current_state()
-        reward = [((player.stack - player.hand_starting_stack) /
-                   self._bigblind if terminal else 0) for player in self._seats]
+        agent = self._seats[self.agent_id]
+        observation = self._get_current_player_state(agent)
+        reward = ((agent.stack - agent.hand_starting_stack) / self._bigblind
+                  if terminal else 0)
         info = {}
-        info['money_won'] = self._seats[0].stack - \
-            (self._seats[0].hand_starting_stack +
-             self._seats[0].blind) if terminal else 0
+        info['money_won'] = agent.stack - \
+            (agent.hand_starting_stack + agent.blind) if terminal else 0
         return observation, reward, terminal, info
